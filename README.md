@@ -4,7 +4,7 @@ This project assigns geneder and culture to patent examiners and lawyers, based 
 ## Code overview
 
 * IBM's Global Name Management API (used in CompleteAnalysisNames.java), which is effectively a lookup table built from culture name specific data. 
-This resource was used to assign gender and culture to every spelling, a given examiner or lawyer may have used. 
+This resource was used to assign gender and culture to every spelling, a given examiner or lawyer used within span of 11 years. 
 
 * Selection of name spelling to represent a given examiner or lawyer can be seen in Gender_CountryCulture_Assignment_v2.py
 
