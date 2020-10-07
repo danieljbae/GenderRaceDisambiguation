@@ -8,12 +8,12 @@ This resource was used to assign gender and culture to every spelling, a given e
 
 * Selection of name spelling to represent a given examiner or lawyer can be seen in Gender_CountryCulture_Assignment_v2.py
 
-## Example Distrubutions
+## Example of Distrubutions 
 
-Below is a snippet of some of the cultural distributions on Examiners:
+Cultural distributions on Examiners:
 
 ![alt text](https://github.com/danieljbae/GenderRaceDisambiguation/blob/master/Examiners_Cultural_Dist.PNG)
 
-Below is a snippet of some of the analysis performed on Examiners, to assign thresholds:
+Some of the analysis performed on Examiners, to assign thresholds:
 
 ![alt text](https://github.com/danieljbae/GenderRaceDisambiguation/blob/master/Examiners_FirstName.PNG)
