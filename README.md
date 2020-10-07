@@ -1,5 +1,5 @@
 # GenderRaceDisambiguation
-This project assigns gender and culture to patent examiners and lawyers (based on patents granted in 2001-2012). And is used to research if bias is exhitbited within an the random assignment process of patent application, where names are the only source of identity.
+This project assigns gender and culture to patent examiners and lawyers (based on patents granted in 2001-2012). And is used to research if bias is exhitbited within the random assignment process of patent application, where names are the only source of identity.
 
 ## Code overview
 
