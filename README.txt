@@ -1,3 +1,0 @@
-Dependencies:
-* numpy           1.19.3
-* pandas          1.1.4
