@@ -62,7 +62,7 @@ class GenderRaceAnalysis:
         genderDf['Male %'] = pd.to_numeric(genderDf[' Male %'], errors='coerce')
         genderDf['Female Classification'] = [ 1 if val >= thresholdFemale else 0 for val in genderDf['Female %']]
         genderDf['Male Classification'] = [ 1 if val >= thresholdMale else 0 for val in genderDf['Male %']]
-        del genderDf[' Male %']
+        del genderDf[' Male %'] 
     
     def IBM_SuperCulture(self):
         """
