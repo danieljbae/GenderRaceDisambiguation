@@ -1,9 +1,3 @@
-# -*- coding: utf-8 -*-
-"""
-Created on Fri May 15 22:31:53 2020
-
-@author: danie
-"""
 # This hash table converts IBM GNR's cultures to a consistent scope of cultures. 
 # ( Asian,Anglo,Arabic,South Asian,Hispanic,Russian,African   ,Ambiguous
 
@@ -32,5 +26,3 @@ culture_dict = {
 "Yoruban": "African",
 "Afghan": "Arabic"
 }
-
-

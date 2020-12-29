@@ -8,12 +8,29 @@ This resource was used to assign gender and culture to every name spelling, a gi
 
 * Selection of name spelling to represent a given examiner or lawyer can be seen in Gender_CountryCulture_Assignment_v2.py
 
+<<<<<<< HEAD
+=======
+
+## Dependencies:
+* numpy           1.19.3
+* pandas          1.1.4
+
+
+>>>>>>> refactor
 ## Example of Distrubutions 
 
 Cultural distributions on Examiners:
 
+<<<<<<< HEAD
 ![alt text](https://github.com/danieljbae/GenderRaceDisambiguation/blob/master/Examiners_Cultural_Dist.PNG)
 
 Some of the analysis performed on Examiners, to assign thresholds:
 
 ![alt text](https://github.com/danieljbae/GenderRaceDisambiguation/blob/master/Examiners_FirstName.PNG)
+=======
+![alt text](https://github.com/danieljbae/GenderRaceDisambiguation/blob/refactor/resources/images/Examiners_Cultural_Dist.PNG)
+
+Some of the analysis performed on Examiners, to assign thresholds:
+
+![alt text](https://github.com/danieljbae/GenderRaceDisambiguation/blob/refactor/resources/images/Examiners_FirstName.PNG)
+>>>>>>> refactor
