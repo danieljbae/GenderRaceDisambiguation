@@ -20,18 +20,20 @@ class GenderRaceAnalysis:
             self.filePathIbm = "data/ibmOuputs/ExaminerDirectory_New_Output3.csv"
             self.filePathPatent = "data/patentData/ExaminerPatentMap.csv"
             # self.patentDataPath = "" # Finish: add my .db file here
-            self.patentDict = self.getPatentData()
+            self.patentDict_FirstName = self.getPatentData()
         elif fileType == "L":
             self.fileType = "Lawyers"
             self.filePathIbm = "data/ibmOuputs/LawyerDirectory_New_Output3.csv"
             self.filePathPatent = "data/patentData/LawyerPatentMap.csv"
             # self.patentDataPath = "" # Finish: add my .db file here
-            self.patentDict = self.getPatentData()
+            self.patentDict_FirstName = self.getPatentData()
 
         self.genderDf,self.countryDf = self.readFile()
         self.IBM_GenderCutoff(self.genderDf,self.femaleThreshold,self.maleThreshold)
         self.IBM_SuperCulture()
-        self.mergePatentIbm()
+        self.patentDict_FirstName = self.mergePatentIbm()
+        self.selectTopIdName(self.patentDict_FirstName)
+        
         
     def readFile(self):
         """
@@ -56,7 +58,7 @@ class GenderRaceAnalysis:
     
     def IBM_GenderCutoff(self, genderDf,thresholdFemale,thresholdMale):
         """
-        Assign Gender to Rows, based on defined threshold 
+        Assign Gender to Rows, based on defined threshold for IBM female/male % 
         """
         genderDf['Female %'] = pd.to_numeric(genderDf['Female %'], errors='coerce')
         genderDf['Male %'] = pd.to_numeric(genderDf[' Male %'], errors='coerce')
@@ -89,74 +91,98 @@ class GenderRaceAnalysis:
         """
         if self.fileType == "Examiners":
 
-            # Finish!!!: First name only, causing problems below in mergePatentIbm() 
-            # b/c I am missing lastname for cultures
+            # Finish!!!: First name only, causing problems below in mergePatentIbm() b/c I am missing lastname for cultures
+            # Update: Remove 51225,SANG KIM (Maps to 8216) and 51224,ELMIRA MEHRMANESH (Maps to 28326) from nameCount dict 
+            badIds = ["51225,SANG KIM","51224,ELMIRA MEHRMANESH"] # Extra IDs not found in Original 
 
             df = pd.read_csv(self.filePathPatent, dtype={"PrimaryID": 'str',"AssistantID": 'str',})
             df["Primary_FirstName_Key"] = df["PrimaryID"] + "," + df["Primary_Firstname"]
             df["AssistantFirstName_Key"] = df["AssistantID"]  + "," + df["Assistant_FirstName"]
             allExaminers = list(df["Primary_FirstName_Key"].dropna()) + list(df["AssistantFirstName_Key"].dropna())
-
-            nameCount = defaultdict(list)
+            patentDict_FirstName = defaultdict(list)
             for key in allExaminers:
-                if key in nameCount:
-                    nameCount[key][0] += 1
+                if key in badIds: continue
+                if key in patentDict_FirstName:
+                    patentDict_FirstName[key][0] += 1
                 else:
-                    nameCount[key].append(1)
-                    idStr = re.search('([0-9]+),.+', key)
-                    if idStr: nameCount[key].append(idStr.group(1))
-            return nameCount
+                    patentDict_FirstName[key].append(1)
+                    idStr = re.search('([0-9]+),.+', key) # finish: use .split() here
+                    if idStr: 
+                        patentDict_FirstName[key].append(idStr.group(1))
+            return patentDict_FirstName
     
     def mergePatentIbm(self):
-
-
+        """
+        Merges: IBM/Directory data onto Patent data dictionary 
+        """
 
         genderDfIbm, countryDfIbm = self.genderDf, self.countryDf
-        patentDict = self.patentDict # Just for First Name search "Finish!!!"
+        patentDict = self.patentDict_FirstName # Just for First Name search "Finish!!!"
         mergedDict_Gender = defaultdict(list)
         mergedDict_Country = defaultdict(list)
-        # print(patentDict)
 
+        # Create dictionary for IBM Data
+        classifications = {}
+        gender_classifications_keys = list(genderDfIbm['ExaminerFirstName_Key'])
+        female_classifications_keys = list(genderDfIbm['Female %'])
+        male_classifications_keys = list(genderDfIbm['Male %'])
+        for key in range(len(gender_classifications_keys)):
+            if gender_classifications_keys[key] in classifications:
+                continue
+            else:
+                classifications[gender_classifications_keys[key]] = [female_classifications_keys[key],male_classifications_keys[key]]
+        
+        # Merge IBM Data onto Patent Data
+        for key in patentDict:
+            if key in classifications:
+                patentDict[key].append(classifications[key][0])
+                patentDict[key].append(classifications[key][1])
+        return patentDict
+        
+    def selectTopIdName(self, examiner_ID_count):
+        # Finish: Get the difference in  = set(result I sent mukund) - set(using this selection)
+        # Caught logical mistake: I was checking if the running count sum was ambigious (denoted by ***)
+        # -> This should give me: +.03% classified and -.03%  unclassified   
+        """
+        Top Name selection prioritizes, names that: 
+        - returned results from IBM GNR
+        - appeared more frequently in patent data  
 
-        print("master len: ", len(genderDfIbm))
-        print("master len 2: ", len(patentDict))
+        ex. top_ID_count[10007] = ['10007,RODNEY H', 4804, 0.0, 98.0]
+        """
 
-        for i in range(len(genderDfIbm)):
+        top_ID_count = {}
+
+        for first_id_key in examiner_ID_count:    
+            if len(examiner_ID_count[first_id_key]) < 4: continue # spelling not in directory, so no classification data
+            examiner_id = examiner_ID_count[first_id_key][1]
             
-            # Problem here: 
-            # - currently, mergedDict_Gender's len = 39325
-            # - correct, mergedDict_Gender's len = 42557
+            # Update Existing Entry:
+            if examiner_id in top_ID_count:
+                if type(examiner_ID_count[first_id_key][2]) == "": examiner_ID_count[first_id_key][2] = 0
+                if type(examiner_ID_count[first_id_key][3]) == "": examiner_ID_count[first_id_key][3] = 0
+                canidate = [first_id_key, examiner_ID_count[first_id_key][0], 
+                    top_ID_count[examiner_id][2] + examiner_ID_count[first_id_key][0], # Running id count sum
+                    examiner_ID_count[first_id_key][2],examiner_ID_count[first_id_key][3]]
+                # if current has greater count, otherwise accumulate
+                if top_ID_count[examiner_id][3] > 0 or top_ID_count[examiner_id][4] > 0: # ***
+                    if (canidate[1] > top_ID_count[examiner_id][2]): 
+                        top_ID_count[examiner_id] = canidate
+                    else: top_ID_count[examiner_id][2] += canidate[1] 
+                # otherwise male or female % is ambigious, so Replace with current
+                else: top_ID_count[examiner_id] = canidate  
 
-            # - currently, mergedDict_Country's len = 147 # Just for First Name search "Finish!!!"
-            # - correct, mergedDict_Country's len = 29923 # Just for First Name search "Finish!!!"
-
-
-            # Gender
-            key = genderDfIbm['ExaminerFirstName_Key'][i]
-        
-            if key in patentDict:# and key not in mergedDict_Gender:
-                idStr_Gender = genderDfIbm['ExaminerID'][i]
-                count = patentDict[key][0]
-                valFemale = genderDfIbm['Female %'][i]
-                valMale = genderDfIbm['Male %'][i]
-                mergedDict_Gender[key] = [count,idStr_Gender,valFemale,valMale]
+            else: 
+                if type(examiner_ID_count[first_id_key][2]) == str: examiner_ID_count[first_id_key][2] = 0
+                if type(examiner_ID_count[first_id_key][3]) == str: examiner_ID_count[first_id_key][3] = 0
+                init = [first_id_key,examiner_ID_count[first_id_key][0],
+                    examiner_ID_count[first_id_key][0], # Running id count sum
+                    examiner_ID_count[first_id_key][2], examiner_ID_count[first_id_key][3]]
+                top_ID_count[examiner_id] = init
             
-            # # Culture
-            # key_Country = countryDfIbm['ExaminerLastName_Key'][i]
-            # if key_Country in patentDict:# and key_Country not in mergedDict_Country:
-            #     idStr_Country = countryDfIbm['ExaminerID'][i]
-            #     count = patentDict[key_Country][0]
-            #     valCountry = countryDfIbm['Country 1'][i]
-            #     valCulture = countryDfIbm['super_culture'][i]
-            #     mergedDict_Country[key_Country] = [count,idStr_Country,valFemale,valMale]
-        
-        print(mergedDict_Gender['10007,RODNEY H']) 
-        print(mergedDict_Gender['25812,MANUEL RIVERA'])
-
-        print(len(mergedDict_Gender))
-        # mergedDict_Gender['10007,RODNEY H'] => [4804, '10007', 0.0, 98.0] ----> non ambigious
-        
-
+        # print(top_ID_count['10007'])
+        # print(len(top_ID_count))
+        return top_ID_count
 
 def main():
     t0 = time.time()
