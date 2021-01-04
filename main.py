@@ -166,22 +166,24 @@ class GenderRaceAnalysis:
                 if type(examiner_ID_count[first_id_key][2]) == "": examiner_ID_count[first_id_key][2] = 0
                 if type(examiner_ID_count[first_id_key][3]) == "": examiner_ID_count[first_id_key][3] = 0
                 canidate = [first_id_key, examiner_ID_count[first_id_key][0], 
-                    top_ID_count[examiner_id][2] + examiner_ID_count[first_id_key][0], # Running id count sum
-                    examiner_ID_count[first_id_key][2],examiner_ID_count[first_id_key][3]]
+                            top_ID_count[examiner_id][2] + examiner_ID_count[first_id_key][0], # Running id count sum
+                            examiner_ID_count[first_id_key][2],examiner_ID_count[first_id_key][3]]
                 # if current has greater count, otherwise accumulate
                 if top_ID_count[examiner_id][3] > 0 or top_ID_count[examiner_id][4] > 0: # ***
                     if (canidate[1] > top_ID_count[examiner_id][2]): 
                         top_ID_count[examiner_id] = canidate
-                    else: top_ID_count[examiner_id][2] += canidate[1] 
+                    else: 
+                        top_ID_count[examiner_id][2] += canidate[1] 
                 # male % or female % is ambigious, so Replace with current
-                else: top_ID_count[examiner_id] = canidate  
+                else: 
+                    top_ID_count[examiner_id] = canidate  
 
             else: 
                 if type(examiner_ID_count[first_id_key][2]) == str: examiner_ID_count[first_id_key][2] = 0
                 if type(examiner_ID_count[first_id_key][3]) == str: examiner_ID_count[first_id_key][3] = 0
                 init = [first_id_key,examiner_ID_count[first_id_key][0],
-                    examiner_ID_count[first_id_key][0], # Running id count sum
-                    examiner_ID_count[first_id_key][2], examiner_ID_count[first_id_key][3]]
+                        examiner_ID_count[first_id_key][0], # Running id count sum
+                        examiner_ID_count[first_id_key][2], examiner_ID_count[first_id_key][3]]
                 top_ID_count[examiner_id] = init
             
         print(top_ID_count['10007'])
