@@ -1,5 +1,6 @@
 
 # Finish: Clean this up and import from "modulesImport.py"
+# Finish: Rather than self.fileType, have subclasses of Examiner and Lawyer, inherit from GenederRaceAnalysis
 import  pandas as pd
 import numpy as np
 from resources.superCultureMap import culture_dict
@@ -12,20 +13,17 @@ class GenderRaceAnalysis:
     def __init__(self,fileType):
         assert fileType == "E" or fileType == "L", ' Must indicate Examiners or Lawyers by passing, either: "E" or "L" '
         self.femaleThreshold = self.maleThreshold = 95
-
         self.superCultureMap = culture_dict
 
         if fileType == "E":
             self.fileType = "Examiners"
             self.filePathIbm = "data/ibmOuputs/ExaminerDirectory_New_Output3.csv"
             self.filePathPatent = "data/patentData/ExaminerPatentMap.csv"
-            # self.patentDataPath = "" # Finish: add my .db file here
             self.patentDict_FirstName = self.getPatentData()
         elif fileType == "L":
             self.fileType = "Lawyers"
             self.filePathIbm = "data/ibmOuputs/LawyerDirectory_New_Output3.csv"
             self.filePathPatent = "data/patentData/LawyerPatentMap.csv"
-            # self.patentDataPath = "" # Finish: add my .db file here
             self.patentDict_FirstName = self.getPatentData()
 
         self.genderDf,self.countryDf = self.readFile()
@@ -52,7 +50,6 @@ class GenderRaceAnalysis:
         # Dataframe for Country and Culture
         clean_df_country = clean_df_master[['ExaminerID', 'FirstName', 'LastName', 'ExaminerFirstName_Key','ExaminerLastName_Key','Country 1','Top Culture', 'Unnamed: 31','Unnamed: 32', 'Unnamed: 33', 'Unnamed: 34','Unnamed: 35', 'Unnamed: 36','Unnamed: 37','Unnamed: 38', 'Unnamed: 39']]
         countryDf = clean_df_country.rename(columns={ "Unnamed: 31": "Top Culture 2"  ,"Unnamed: 32": "Top Culture 3","Unnamed: 33": "Top Culture 4","Unnamed: 34": "Top Culture 5","Unnamed: 35": "Top Culture 6","Unnamed: 36": "Top Culture 7","Unnamed: 37": "Top Culture 8","Unnamed: 38": "Top Culture 9","Unnamed: 39": "Top Culture 10"})
-
         return genderDf, countryDf
        
     
@@ -87,13 +84,12 @@ class GenderRaceAnalysis:
 
     def getPatentData(self):
         """
-      
+        Creates counter dictionary for names in Patent data
         """
         if self.fileType == "Examiners":
 
-            # Finish!!!: First name only, causing problems below in mergePatentIbm() b/c I am missing lastname for cultures
-            # Update: Remove 51225,SANG KIM (Maps to 8216) and 51224,ELMIRA MEHRMANESH (Maps to 28326) from nameCount dict 
-            badIds = ["51225,SANG KIM","51224,ELMIRA MEHRMANESH"] # Extra IDs not found in Original 
+            ### FirstName
+            badIds = ["51225,SANG KIM","51224,ELMIRA MEHRMANESH"] # Extra IDs not found in Original  51225,SANG KIM (Maps to 8216) and 51224,ELMIRA MEHRMANESH (Maps to 28326) from nameCount dict 
 
             df = pd.read_csv(self.filePathPatent, dtype={"PrimaryID": 'str',"AssistantID": 'str',})
             df["Primary_FirstName_Key"] = df["PrimaryID"] + "," + df["Primary_Firstname"]
@@ -106,18 +102,26 @@ class GenderRaceAnalysis:
                     patentDict_FirstName[key][0] += 1
                 else:
                     patentDict_FirstName[key].append(1)
-                    idStr = re.search('([0-9]+),.+', key) # finish: use .split() here
-                    if idStr: 
-                        patentDict_FirstName[key].append(idStr.group(1))
+                    idStr = key.split(",")[0]
+                    patentDict_FirstName[key].append(idStr)
+                    # idStr = re.search('([0-9]+),.+', key) # Compare runtime of: .split() vs Regex, remember key is a small str
+                    # if idStr: 
+                    #     patentDict_FirstName[key].append(idStr.group(1))
+            
+            ### LastName
+            # Finish: Generalize for last Name 
+            # Finish: Use inhertance for subclass of Lawyer 
             return patentDict_FirstName
     
+    
+    # Finish: Generalize for last Name and optimize space
+    # Finish: Use inhertance for subclass of Lawyer 
     def mergePatentIbm(self):
         """
         Merges: IBM/Directory data onto Patent data dictionary 
         """
-
         genderDfIbm, countryDfIbm = self.genderDf, self.countryDf
-        patentDict = self.patentDict_FirstName # Just for First Name search "Finish!!!"
+        patentDict = self.patentDict_FirstName
         mergedDict_Gender = defaultdict(list)
         mergedDict_Country = defaultdict(list)
 
@@ -139,10 +143,12 @@ class GenderRaceAnalysis:
                 patentDict[key].append(classifications[key][1])
         return patentDict
         
-    def selectTopIdName(self, examiner_ID_count):
-        # Finish: Get the difference in  = set(result I sent mukund) - set(using this selection)
-        # Caught logical mistake: I was checking if the running count sum was ambigious (denoted by ***)
-        # -> This should give me: +.03% classified and -.03%  unclassified   
+
+
+    # Finish: Get the difference in  = set(result I sent mukund) - set(using this selection)
+    # Caught logical mistake: I was checking if the running count sum was ambigious (denoted by ***)
+    # -> This should give me: +.03% classified and -.03%  unclassified 
+    def selectTopIdName(self, examiner_ID_count):  
         """
         Top Name selection prioritizes, names that: 
         - returned results from IBM GNR
@@ -150,9 +156,7 @@ class GenderRaceAnalysis:
 
         ex. top_ID_count[10007] = ['10007,RODNEY H', 4804, 0.0, 98.0]
         """
-
         top_ID_count = {}
-
         for first_id_key in examiner_ID_count:    
             if len(examiner_ID_count[first_id_key]) < 4: continue # spelling not in directory, so no classification data
             examiner_id = examiner_ID_count[first_id_key][1]
@@ -169,7 +173,7 @@ class GenderRaceAnalysis:
                     if (canidate[1] > top_ID_count[examiner_id][2]): 
                         top_ID_count[examiner_id] = canidate
                     else: top_ID_count[examiner_id][2] += canidate[1] 
-                # otherwise male or female % is ambigious, so Replace with current
+                # male % or female % is ambigious, so Replace with current
                 else: top_ID_count[examiner_id] = canidate  
 
             else: 
@@ -180,19 +184,17 @@ class GenderRaceAnalysis:
                     examiner_ID_count[first_id_key][2], examiner_ID_count[first_id_key][3]]
                 top_ID_count[examiner_id] = init
             
-        # print(top_ID_count['10007'])
-        # print(len(top_ID_count))
+        print(top_ID_count['10007'])
+        print(len(top_ID_count))
         return top_ID_count
 
 def main():
     t0 = time.time()
     examinerObj = GenderRaceAnalysis("E")
-    # print(f'gender df: {examinerObj.genderDf.head(1)}')
-    # print(f'country df: {examinerObj.countryDf.head(1)}')
-
     t1 = time.time()
     print(f"time elapsed: {round(t1-t0,2)} sec")
+
+    # print(f'gender df: {examinerObj.genderDf.head(1)}')
+    # print(f'country df: {examinerObj.countryDf.head(1)}')
     
-
-
 main()
