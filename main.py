@@ -158,7 +158,7 @@ class GenderRaceAnalysis:
         """
         top_ID_count = {}
         for first_id_key in examiner_ID_count:    
-            if len(examiner_ID_count[first_id_key]) < 4: continue # spelling not in directory, so no classification data
+            if len(examiner_ID_count[first_id_key]) < 4: continue # name does not have return value from GNR
             examiner_id = examiner_ID_count[first_id_key][1]
             
             # Update Existing Entry:
