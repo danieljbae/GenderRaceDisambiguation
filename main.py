@@ -1,5 +1,6 @@
 
 # Finish: Clean this up and import from "modulesImport.py"
+# Finish: Add file resources\columns.py for genderDf and countryDf
 # Finish: Rather than self.fileType, have subclasses of Examiner and Lawyer, inherit from GenederRaceAnalysis
 import  pandas as pd
 import numpy as np
@@ -14,14 +15,18 @@ class GenderRaceAnalysis:
         assert fileType == "E" or fileType == "L", ' Must indicate Examiners or Lawyers by passing, either: "E" or "L" '
         self.femaleThreshold = self.maleThreshold = 95
         self.superCultureMap = culture_dict
+        self.firstNameFreq_Threshold = .40
+        self.lastNameFreq_Threshold = .90
 
         if fileType == "E":
             self.fileType = "Examiners"
+            self.idColumnName = "Examiner_ID"
             self.filePathIbm = "data/ibmOuputs/ExaminerDirectory_New_Output3.csv"
             self.filePathPatent = "data/patentData/ExaminerPatentMap.csv"
             self.patentDict_FirstName = self.getPatentData()
         elif fileType == "L":
             self.fileType = "Lawyers"
+            self.idColumnName = "Lawyer_ID"
             self.filePathIbm = "data/ibmOuputs/LawyerDirectory_New_Output3.csv"
             self.filePathPatent = "data/patentData/LawyerPatentMap.csv"
             self.patentDict_FirstName = self.getPatentData()
@@ -30,7 +35,10 @@ class GenderRaceAnalysis:
         self.IBM_GenderCutoff(self.genderDf,self.femaleThreshold,self.maleThreshold)
         self.IBM_SuperCulture()
         self.patentDict_FirstName = self.mergePatentIbm()
-        self.selectTopIdName(self.patentDict_FirstName)
+        self.idTopFirstName = self.selectTopName(self.patentDict_FirstName)
+        # self.idTopLastName = self.selectTopName(self.patentDict_LastName)
+        self.test(self.idTopFirstName, self.idColumnName)
+        
         
         
     def readFile(self):
@@ -54,7 +62,7 @@ class GenderRaceAnalysis:
        
     
     def IBM_GenderCutoff(self, genderDf,thresholdFemale,thresholdMale):
-        """
+        """ 
         Assign Gender to Rows, based on defined threshold for IBM female/male % 
         """
         genderDf['Female %'] = pd.to_numeric(genderDf['Female %'], errors='coerce')
@@ -114,7 +122,8 @@ class GenderRaceAnalysis:
             return patentDict_FirstName
     
     
-    # Finish: Generalize for last Name and optimize space
+    # Finish: optimize this function in general space like using dictionary comprehensiopn and numpy arrays
+    # Finish: Generalize for last Name 
     # Finish: Use inhertance for subclass of Lawyer 
     def mergePatentIbm(self):
         """
@@ -142,61 +151,88 @@ class GenderRaceAnalysis:
                 patentDict[key].append(classifications[key][0])
                 patentDict[key].append(classifications[key][1])
         return patentDict
-        
 
-
+    # Changed from [2],[3] to [3],[4] || from x  > 0 to x >= 0 
+    # Caught logical mistake: I was checking if the running count sum was ambigious (denoted by ***)  -> This should give me: +.03% classified and -.03%  unclassified 
     # Finish: Get the difference in  = set(result I sent mukund) - set(using this selection)
-    # Caught logical mistake: I was checking if the running count sum was ambigious (denoted by ***)
-    # -> This should give me: +.03% classified and -.03%  unclassified 
-    def selectTopIdName(self, examiner_ID_count):  
+    def selectTopName(self, idName_Count):  
         """
-        Top Name selection prioritizes, names that: 
-        - returned results from IBM GNR
-        - appeared more frequently in patent data  
+        Chooses "top name" for any given ID, by prioritizing:
+        Names that returned results from IBM GNR, then the most frequent name (relative to ID)
 
-        ex. top_ID_count[10007] = ['10007,RODNEY H', 4804, 0.0, 98.0]
+        ex. idsTopName[10007] = ['10007,RODNEY H', 4804, 4843, 0.0, 98.0]
         """
-        top_ID_count = {}
-        for first_id_key in examiner_ID_count:    
-            if len(examiner_ID_count[first_id_key]) < 4: continue # name does not have return value from GNR
-            examiner_id = examiner_ID_count[first_id_key][1]
-            
-            # Update Existing Entry:
-            if examiner_id in top_ID_count:
-                if type(examiner_ID_count[first_id_key][2]) == "": examiner_ID_count[first_id_key][2] = 0
-                if type(examiner_ID_count[first_id_key][3]) == "": examiner_ID_count[first_id_key][3] = 0
-                canidate = [first_id_key, examiner_ID_count[first_id_key][0], 
-                            top_ID_count[examiner_id][2] + examiner_ID_count[first_id_key][0], # Running id count sum
-                            examiner_ID_count[first_id_key][2],examiner_ID_count[first_id_key][3]]
-                # if current has greater count, otherwise accumulate
-                if top_ID_count[examiner_id][3] > 0 or top_ID_count[examiner_id][4] > 0: # ***
-                    if (canidate[1] > top_ID_count[examiner_id][2]): 
-                        top_ID_count[examiner_id] = canidate
-                    else: 
-                        top_ID_count[examiner_id][2] += canidate[1] 
-                # male % or female % is ambigious, so Replace with current
-                else: 
-                    top_ID_count[examiner_id] = canidate  
+        idTopName = {}
+        for first_id_key in idName_Count:    
+            # Name does not have return value from GNR
+            if len(idName_Count[first_id_key]) < 4: continue
 
+            examiner_id = idName_Count[first_id_key][1]
+            if examiner_id in idTopName:                                                                  
+                if type(idName_Count[first_id_key][2]) == str: idName_Count[first_id_key][2] = 0
+                if type(idName_Count[first_id_key][3]) == str: idName_Count[first_id_key][3] = 0
+
+                # Accumulate running count of ID occurences in patent data   
+                runningCount = idTopName[examiner_id][2] + idName_Count[first_id_key][0] 
+                canidate = [first_id_key, idName_Count[first_id_key][0], runningCount,                 
+                            idName_Count[first_id_key][2],idName_Count[first_id_key][3]]
+                # If Existing ID's top name has valid male % and female %
+                if idTopName[examiner_id][3] >= 0 or idTopName[examiner_id][4] >= 0: # ***             
+                    if (canidate[1] > idTopName[examiner_id][2]): # If current has greater count
+                        idTopName[examiner_id] = canidate
+                    else:
+                        idTopName[examiner_id][2] = runningCount
+                else:
+                    idTopName[examiner_id] = canidate                                               # Finish: see if you can cosolidate IFs by 1 layer,  with above where we assign canidate
             else: 
-                if type(examiner_ID_count[first_id_key][2]) == str: examiner_ID_count[first_id_key][2] = 0
-                if type(examiner_ID_count[first_id_key][3]) == str: examiner_ID_count[first_id_key][3] = 0
-                init = [first_id_key,examiner_ID_count[first_id_key][0],
-                        examiner_ID_count[first_id_key][0], # Running id count sum
-                        examiner_ID_count[first_id_key][2], examiner_ID_count[first_id_key][3]]
-                top_ID_count[examiner_id] = init
+                if type(idName_Count[first_id_key][2]) == str: idName_Count[first_id_key][2] = 0
+                if type(idName_Count[first_id_key][3]) == str: idName_Count[first_id_key][3] = 0
+                runningCount = idName_Count[first_id_key][0]
+                init = [first_id_key,idName_Count[first_id_key][0], runningCount,
+                        idName_Count[first_id_key][2], idName_Count[first_id_key][3]]
+                idTopName[examiner_id] = init
             
-        print(top_ID_count['10007'])
-        print(len(top_ID_count))
-        return top_ID_count
+        # print(idTopName['10007'])
+        # print(len(idTopName))
+        return idTopName
+
+    def test(self, idTopName, idColumnName):
+        """
+        Generates 2 Dataframes for classified and non-classified IDs
+        Based on frequency threshold and IBM threshold 
+        """
+        # List of dictionaries, where: key,val pairs are rows in dataframe
+        fullDataDf = pd.DataFrame([ {idColumnName: idStr, 
+                                "Key_topSpelling": topName, 
+                                "Freq": Freq, "Total": Total, 
+                                "Freq%": round(Freq/Total,2),
+                                "Female%":female , 
+                                "Male%":male
+                                } for idStr, (topName, Freq, Total, female, male) in idTopName.items() ]
+                        )
+        
+        # Determine which IDs met our classification criteria 
+        met_threshold = [ idTopName[key][0] for key,freq in zip(idTopName,fullDataDf['Freq%']) 
+                                            if (idTopName[key][3]>= self.femaleThreshold or idTopName[key][4] >= self.maleThreshold) and (freq >= self.firstNameFreq_Threshold) ]
+        # Partition fullData into 2 dataframes based on classification criteria         
+        classifiedDf = fullDataDf[fullDataDf['Key_topSpelling'].isin(met_threshold)]
+        notClassifiedDf = fullDataDf[~fullDataDf['Key_topSpelling'].isin(met_threshold)]
+    
+        print("classified: - ",len(classifiedDf), ":", round(len(classifiedDf)/len(idTopName)*100,2))
+        print("not classified - ",len(notClassifiedDf), ":", round(len(notClassifiedDf)/len(idTopName)*100,2))
+
 
 def main():
     t0 = time.time()
     examinerObj = GenderRaceAnalysis("E")
+    # lawyerObj = GenderRaceAnalysis("L")
+
+
+
     t1 = time.time()
     print(f"time elapsed: {round(t1-t0,2)} sec")
 
     # print(f'gender df: {examinerObj.genderDf.head(1)}')
-    # print(f'country df: {examinerObj.countryDf.head(1)}')
+    print(f'country df: {examinerObj.countryDf.head()}')
     
 main()
