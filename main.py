@@ -2,13 +2,14 @@
 # Finish: Clean this up and import from "modulesImport.py"
 # Finish: Add file resources\columns.py for genderDf and countryDf
 # Finish: Rather than self.fileType, have subclasses of Examiner and Lawyer, inherit from GenederRaceAnalysis
+
+
 import  pandas as pd
 import numpy as np
 from resources.superCultureMap import culture_dict
 import time
 from collections import defaultdict
 import regex as re
-
 
 class GenderRaceAnalysis:
     def __init__(self,fileType):
@@ -23,20 +24,37 @@ class GenderRaceAnalysis:
             self.idColumnName = "Examiner_ID"
             self.filePathIbm = "data/ibmOuputs/ExaminerDirectory_New_Output3.csv"
             self.filePathPatent = "data/patentData/ExaminerPatentMap.csv"
-            self.patentDict_FirstName = self.getPatentData()
+            self.patentDict_FirstName, self.patentDict_LastName = self.getPatentData()
         elif fileType == "L":
             self.fileType = "Lawyers"
             self.idColumnName = "Lawyer_ID"
             self.filePathIbm = "data/ibmOuputs/LawyerDirectory_New_Output3.csv"
             self.filePathPatent = "data/patentData/LawyerPatentMap.csv"
-            self.patentDict_FirstName = self.getPatentData()
+            self.patentDict_FirstName, self.patentDict_LastName = self.getPatentData()
 
         self.genderDf,self.countryDf = self.readFile()
         self.IBM_GenderCutoff(self.genderDf,self.femaleThreshold,self.maleThreshold)
         self.IBM_SuperCulture()
-        self.patentDict_FirstName = self.mergePatentIbm()
-        self.idTopFirstName = self.selectTopName(self.patentDict_FirstName)
-        # self.idTopLastName = self.selectTopName(self.patentDict_LastName)
+        self.patentDict_FirstName = self.mergePatentIbm(patentDict=self.patentDict_FirstName, IbmDf=self.genderDf,keyColumn="ExaminerFirstName_Key",ibmVal1="Female %",ibmVal2= "Male %")
+        self.patentDict_LastName = self.mergePatentIbm(patentDict=self.patentDict_LastName, IbmDf=self.countryDf,keyColumn="ExaminerLastName_Key",ibmVal1="Country 1",ibmVal2= "super_culture")
+        
+
+        self.idTopFirstName = self.selectTopFirstName(self.patentDict_FirstName)
+        self.idTopLastName = self.selectTopLastName(self.patentDict_LastName)
+        
+        # The total count of ID should not be different ----> Error must be in SelectTopName()
+        # idTopFirstName[950] = ['950,GRANT H', 1, 5, 0.0, 98.0]
+        # idTopLastName[950] = ['950,SKAGGS', 2893, 2901, 'United Kingdom', 'Anglo']
+
+        i = 0 
+        for key in self.idTopLastName.keys():
+            if i == 10: break
+            i += 1
+            print(self.idTopFirstName[key])
+            print(self.idTopLastName[key])
+            print()
+        
+
         self.test(self.idTopFirstName, self.idColumnName)
         
         
@@ -79,10 +97,12 @@ class GenderRaceAnalysis:
         for index, row in self.countryDf.loc[:, "Top Culture":"Top Culture 10"].iterrows():
             cultures = set(filter(lambda x: False if x == "" else True,row)) # filter out instances with no culuture value (ex. "Top Culture 10" column)
             superCultures = [self.superCultureMap[culture] for culture in cultures] 
-            if "Ambiguous" not in superCultures and len(superCultures) == 1:
-                superCulturesCol.append(superCultures[0])
-            elif "Ambiguous" in superCultures or len(superCultures) > 1:
+            if len(superCultures) > 1:
                 superCulturesCol.append("No certain culture")
+            elif "Ambiguous" not in superCultures and len(superCultures) == 1:
+                superCulturesCol.append(superCultures[0])
+            # elif "Ambiguous" in superCultures or len(superCultures) > 1:
+            #     superCulturesCol.append("No certain culture")
             else:
                 superCulturesCol.append("Ambiguous")
         
@@ -95,55 +115,53 @@ class GenderRaceAnalysis:
         Creates counter dictionary for names in Patent data
         """
         if self.fileType == "Examiners":
-
-            ### FirstName
-            badIds = ["51225,SANG KIM","51224,ELMIRA MEHRMANESH"] # Extra IDs not found in Original  51225,SANG KIM (Maps to 8216) and 51224,ELMIRA MEHRMANESH (Maps to 28326) from nameCount dict 
-
             df = pd.read_csv(self.filePathPatent, dtype={"PrimaryID": 'str',"AssistantID": 'str',})
-            df["Primary_FirstName_Key"] = df["PrimaryID"] + "," + df["Primary_Firstname"]
-            df["AssistantFirstName_Key"] = df["AssistantID"]  + "," + df["Assistant_FirstName"]
-            allExaminers = list(df["Primary_FirstName_Key"].dropna()) + list(df["AssistantFirstName_Key"].dropna())
-            patentDict_FirstName = defaultdict(list)
-            for key in allExaminers:
-                if key in badIds: continue
-                if key in patentDict_FirstName:
-                    patentDict_FirstName[key][0] += 1
-                else:
-                    patentDict_FirstName[key].append(1)
-                    idStr = key.split(",")[0]
-                    patentDict_FirstName[key].append(idStr)
-                    # idStr = re.search('([0-9]+),.+', key) # Compare runtime of: .split() vs Regex, remember key is a small str
-                    # if idStr: 
-                    #     patentDict_FirstName[key].append(idStr.group(1))
-            
-            ### LastName
-            # Finish: Generalize for last Name 
-            # Finish: Use inhertance for subclass of Lawyer 
-            return patentDict_FirstName
+
+            # All FirstNames counter dictionary of patent data
+            df["Primary_FirstNameKey"] = df["PrimaryID"] + "," + df["Primary_Firstname"]
+            df["Assistant_FirstNameKey"] = df["AssistantID"]  + "," + df["Assistant_FirstName"]
+            # All LastNames counter dictionary of patent data
+            df["Primary_LastNameKey"] = df["PrimaryID"] + "," + df["Primary_Lastname"]
+            df["Assistant_LastNameKey"] = df["AssistantID"]  + "," + df["Assistant_Lastname"]
+
+            def createDict(primaryCol,assistantCol):
+                badIds = ["51225,SANG KIM","51224,ELMIRA MEHRMANESH"] # Extra IDs not found in Original  51225,SANG KIM (Maps to 8216) and 51224,ELMIRA MEHRMANESH (Maps to 28326) from nameCount dict 
+                
+                # # Might cause issues if I need to drop specific columns between first and last names 
+                allExaminers = list(df[primaryCol].dropna()) + list(df[assistantCol].dropna())
+                patentDict_Name = defaultdict(list)
+                for key in allExaminers:
+                    if key in badIds: continue
+                    if key in patentDict_Name:
+                        patentDict_Name[key][0] += 1
+                    else:
+                        patentDict_Name[key].append(1)
+                        idStr = key.split(",")[0]
+                        patentDict_Name[key].append(idStr)
+                return patentDict_Name
+
+            patentDict_FirstName = createDict(primaryCol="Primary_FirstNameKey",assistantCol="Assistant_FirstNameKey")
+            patentDict_LastName = createDict(primaryCol="Primary_LastNameKey",assistantCol="Assistant_LastNameKey")            
+            return patentDict_FirstName, patentDict_LastName
     
     
     # Finish: optimize this function in general space like using dictionary comprehensiopn and numpy arrays
     # Finish: Generalize for last Name 
     # Finish: Use inhertance for subclass of Lawyer 
-    def mergePatentIbm(self):
+    def mergePatentIbm(self, patentDict,IbmDf,keyColumn,ibmVal1,ibmVal2):
         """
         Merges: IBM/Directory data onto Patent data dictionary 
         """
-        genderDfIbm, countryDfIbm = self.genderDf, self.countryDf
-        patentDict = self.patentDict_FirstName
-        mergedDict_Gender = defaultdict(list)
-        mergedDict_Country = defaultdict(list)
-
         # Create dictionary for IBM Data
         classifications = {}
-        gender_classifications_keys = list(genderDfIbm['ExaminerFirstName_Key'])
-        female_classifications_keys = list(genderDfIbm['Female %'])
-        male_classifications_keys = list(genderDfIbm['Male %'])
-        for key in range(len(gender_classifications_keys)):
-            if gender_classifications_keys[key] in classifications:
+        nameKeys = list(IbmDf[keyColumn])
+        classification1 = list(IbmDf[ibmVal1])
+        classification2 = list(IbmDf[ibmVal2])
+        for key in range(len(nameKeys)):
+            if nameKeys[key] in classifications:
                 continue
             else:
-                classifications[gender_classifications_keys[key]] = [female_classifications_keys[key],male_classifications_keys[key]]
+                classifications[nameKeys[key]] = [classification1[key],classification2[key]]
         
         # Merge IBM Data onto Patent Data
         for key in patentDict:
@@ -155,7 +173,7 @@ class GenderRaceAnalysis:
     # Changed from [2],[3] to [3],[4] || from x  > 0 to x >= 0 
     # Caught logical mistake: I was checking if the running count sum was ambigious (denoted by ***)  -> This should give me: +.03% classified and -.03%  unclassified 
     # Finish: Get the difference in  = set(result I sent mukund) - set(using this selection)
-    def selectTopName(self, idName_Count):  
+    def selectTopFirstName(self, idName_Count):  
         """
         Chooses "top name" for any given ID, by prioritizing:
         Names that returned results from IBM GNR, then the most frequent name (relative to ID)
@@ -163,38 +181,76 @@ class GenderRaceAnalysis:
         ex. idsTopName[10007] = ['10007,RODNEY H', 4804, 4843, 0.0, 98.0]
         """
         idTopName = {}
-        for first_id_key in idName_Count:    
+        for nameKey in idName_Count:    
             # Name does not have return value from GNR
-            if len(idName_Count[first_id_key]) < 4: continue
-
-            examiner_id = idName_Count[first_id_key][1]
-            if examiner_id in idTopName:                                                                  
-                if type(idName_Count[first_id_key][2]) == str: idName_Count[first_id_key][2] = 0
-                if type(idName_Count[first_id_key][3]) == str: idName_Count[first_id_key][3] = 0
-
+            if len(idName_Count[nameKey]) < 4: continue
+            idVal = idName_Count[nameKey][1]
+            if idVal in idTopName:
+                if type(idName_Count[nameKey][2]) == str: idName_Count[nameKey][2] = 0
+                if type(idName_Count[nameKey][3]) == str: idName_Count[nameKey][3] = 0
                 # Accumulate running count of ID occurences in patent data   
-                runningCount = idTopName[examiner_id][2] + idName_Count[first_id_key][0] 
-                canidate = [first_id_key, idName_Count[first_id_key][0], runningCount,                 
-                            idName_Count[first_id_key][2],idName_Count[first_id_key][3]]
+                runningCount = idTopName[idVal][2] + idName_Count[nameKey][0] 
+                canidate = [nameKey, idName_Count[nameKey][0], runningCount,                 
+                            idName_Count[nameKey][2],idName_Count[nameKey][3]]
                 # If Existing ID's top name has valid male % and female %
-                if idTopName[examiner_id][3] >= 0 or idTopName[examiner_id][4] >= 0: # ***             
-                    if (canidate[1] > idTopName[examiner_id][2]): # If current has greater count
-                        idTopName[examiner_id] = canidate
+                if idTopName[idVal][3] >= 0 or idTopName[idVal][4] >= 0: # ***             
+                    if (canidate[1] > idTopName[idVal][2]): # If current has greater count
+                        idTopName[idVal] = canidate
                     else:
-                        idTopName[examiner_id][2] = runningCount
+                        idTopName[idVal][2] = runningCount
                 else:
-                    idTopName[examiner_id] = canidate                                               # Finish: see if you can cosolidate IFs by 1 layer,  with above where we assign canidate
+                    idTopName[idVal] = canidate                                               # Finish: see if you can cosolidate IFs by 1 layer,  with above where we assign canidate
             else: 
-                if type(idName_Count[first_id_key][2]) == str: idName_Count[first_id_key][2] = 0
-                if type(idName_Count[first_id_key][3]) == str: idName_Count[first_id_key][3] = 0
-                runningCount = idName_Count[first_id_key][0]
-                init = [first_id_key,idName_Count[first_id_key][0], runningCount,
-                        idName_Count[first_id_key][2], idName_Count[first_id_key][3]]
-                idTopName[examiner_id] = init
-            
+                if type(idName_Count[nameKey][2]) == str: idName_Count[nameKey][2] = 0
+                if type(idName_Count[nameKey][3]) == str: idName_Count[nameKey][3] = 0
+                runningCount = idName_Count[nameKey][0]
+                init = [nameKey,idName_Count[nameKey][0], runningCount,
+                        idName_Count[nameKey][2], idName_Count[nameKey][3]]
+                idTopName[idVal] = init
+        
         # print(idTopName['10007'])
         # print(len(idTopName))
         return idTopName
+
+
+
+
+    def selectTopLastName(self, idName_Count):  
+        """
+        Chooses "top name" for any given ID, by prioritizing:
+        Names that returned results from IBM GNR, then the most frequent name (relative to ID)
+
+        ex. idsTopName[10007] = ['10007,BONCK', 4816, 4843, 'Belgium', 'Anglo']
+        """
+        idTopName = {}
+        for nameKey in idName_Count:    
+            # Name does not have return value from GNR
+            if len(idName_Count[nameKey]) < 4: continue
+            idVal = idName_Count[nameKey][1]
+            if idVal in idTopName:
+                # Accumulate running count of ID occurences in patent data   
+                runningCount = idTopName[idVal][2] + idName_Count[nameKey][0] 
+                canidate = [nameKey, idName_Count[nameKey][0], runningCount,                 
+                            idName_Count[nameKey][2],idName_Count[nameKey][3]]
+                # consider updating if existing values are valid
+                if idTopName[idVal][3] != "" or idTopName[idVal][4] != "Ambiguous": # ***             
+                    if (canidate[1] > idTopName[idVal][2]): # If current has greater count
+                        idTopName[idVal] = canidate
+                    else:
+                        idTopName[idVal][2] = runningCount
+                else:
+                    idTopName[idVal] = canidate                                               # Finish: see if you can cosolidate IFs by 1 layer,  with above where we assign canidate
+            else: 
+                runningCount = idName_Count[nameKey][0]
+                init = [nameKey,idName_Count[nameKey][0], runningCount,
+                        idName_Count[nameKey][2], idName_Count[nameKey][3]]
+                idTopName[idVal] = init
+   
+        # print(idTopName['10007'])
+        # print(len(idTopName))
+        return idTopName
+
+    
 
     def test(self, idTopName, idColumnName):
         """
